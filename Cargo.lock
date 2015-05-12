@@ -1,0 +1,4 @@
+[root]
+name = "raytracer-rs"
+version = "0.1.0"
+
