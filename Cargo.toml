@@ -2,3 +2,7 @@
 name = "raytracer-rs"
 version = "0.1.0"
 authors = ["Luke Hoban <lukehoban@gmail.com>"]
+
+[dependencies]
+time = "0.1.12"
+image = "*"
