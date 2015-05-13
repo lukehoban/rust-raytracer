@@ -197,7 +197,7 @@ fn get_reflection_color(thing: &Thing, pos: Vector, rd: Vector, scene: &Scene, d
 }
 
 fn get_natural_color(thing: &Thing, pos: &Vector, normal: &Vector, rd: &Vector, scene: &Scene) -> Color {
-    let add_light = |col: Color, light: &Light| {
+    scene.lights.iter().fold(Color::black(), |col, light| {
         let ldis = Vector::minus(&light.pos, &pos);
         let livec = Vector::norm(&ldis);
         let neat_isect = test_ray(&Ray {start: &pos, dir: &livec}, &scene);
@@ -222,8 +222,7 @@ fn get_natural_color(thing: &Thing, pos: &Vector, normal: &Vector, rd: &Vector, 
             Color::plus(&col, &Color::plus(&Color::times(&thing.surface().diffuse(pos), &lcolor),
                                            &Color::times(&thing.surface().specular(pos), &scolor)))
         }
-    };
-    scene.lights.iter().fold(Color::black(), add_light)
+    })
 }
 
 
@@ -247,9 +246,10 @@ fn default_scene() -> Scene {
 fn main() {
     println!("Rendering...");
 
+    let scene = default_scene();
+
     let width = 1000;
     let height = 1000;
-    let scene = default_scene();
     let ref camera = scene.camera;
     let get_point = |x,y| {
         let recenter_x = |x: f64| (x - ((width as f64) / 2.0))  / (2.0 * (width as f64));
