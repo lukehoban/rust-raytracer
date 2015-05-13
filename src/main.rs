@@ -248,8 +248,8 @@ fn main() {
 
     let scene = default_scene();
 
-    let width = 1000;
-    let height = 1000;
+    let width = 4000;
+    let height = 4000;
     let ref camera = scene.camera;
     let get_point = |x,y| {
         let recenter_x = |x: f64| (x - ((width as f64) / 2.0))  / (2.0 * (width as f64));
