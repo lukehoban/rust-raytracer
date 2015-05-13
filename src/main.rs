@@ -30,7 +30,8 @@ impl Vector {
     fn cross(v1: &Vector, v2: &Vector) -> Vector {
         Vector { x: v1.y*v2.z-v1.z*v2.y, y: v1.z*v2.x-v1.x*v2.z, z: v1.x*v2.y-v1.y*v2.x }
     }
-    fn dot_pos_neg<T, F1, F2>(v1: &Vector, v2: &Vector, pos: F1, neg: F2) -> T where F1: FnOnce(f64) -> T, F2: FnOnce(f64) -> T {
+    fn dot_pos_neg<T, F1, F2>(v1: &Vector, v2: &Vector, pos: F1, neg: F2) -> T
+            where F1: FnOnce(f64) -> T, F2: FnOnce(f64) -> T {
         let d = Vector::dot(&v1, &v2);
         if d > 0.0 { pos(d) } else { neg(d) }
     }
@@ -86,15 +87,10 @@ impl Thing for Sphere {
     }
     fn intersect<'a>(&'a self, ray: &Ray) -> Option<Intersect<'a>> {
         let eo = Vector::minus(&self.center, &ray.start);
-        let dist = Vector::dot_pos_neg(&eo, &ray.dir, |v| {
+        Vector::dot_pos_neg(&eo, &ray.dir, |v| {
             let disc = self.radius*self.radius - Vector::dot(&eo, &eo) + v*v;
-            if disc < 0.0 { 0.0 } else { v - disc.sqrt() }
-        }, |_| 0.0);
-        if dist == 0.0 {
-            None
-        } else {
-            Some(Intersect { thing: self, dist: dist})
-        }
+            if disc < 0.0 { None } else { Some(Intersect { thing: self, dist: v - disc.sqrt() }) }
+        }, |_| None)
     }
 }
 
@@ -167,9 +163,7 @@ fn test_ray(ray: &Ray, scene: &Scene) -> Option<f64> {
 }
 
 fn trace_ray(ray: &Ray, scene: &Scene, depth: u32) -> Color {
-    intersections(&ray, &scene).map_or(
-        Color::background(),
-        |isect| shade(&isect, &scene, &ray, depth))
+    intersections(&ray, &scene).map_or(Color::background(), |isect| shade(&isect, &scene, &ray, depth))
 }
 
 const MAXDEPTH: u32 = 5;
@@ -178,7 +172,7 @@ fn shade(isect: &Intersect, scene: &Scene, ray: &Ray, depth: u32) -> Color {
     let d = ray.dir;
     let pos = Vector::plus(&Vector::times(isect.dist, &d), &ray.start);
     let normal = isect.thing.normal(&pos);
-    let reflect_dir = Vector::minus(&d, &Vector::times(2.0, &Vector::times(Vector::dot(&normal, &d), &normal)));
+    let reflect_dir = Vector::minus(&d, &Vector::times(2.0 * Vector::dot(&normal, &d), &normal));
     let natural_color = Color::plus(
         &Color::background(),
         &get_natural_color(isect.thing, &pos, &normal, &reflect_dir, &scene));
