@@ -1,6 +1,7 @@
 extern crate image;
 
 use std::path::Path;
+use std::f64::INFINITY;
 use image::ImageBuffer;
 
 struct Vector { x: f64, y: f64, z: f64 }
@@ -70,6 +71,10 @@ impl Thing for Sphere {
 
 
 fn intersections(ray: Ray, scene: &Scene) -> Option<&Intersect>{
+  let closest = INFINITY;
+  for thing in &scene.things {
+      let inter = thing.intersect(ray);
+  }
   panic!()
 }
 
@@ -82,7 +87,8 @@ fn trace_ray(ray: Ray, scene: Scene, depth: u32) -> Color {
 
 fn default_scene() -> Scene {
     Scene {
-        things: vec![Box::new(Sphere { center: Vector { x: 0.0, y: 1.0, z: -0.25}, radius: 1.0 })],
+        things: vec![Box::new(Sphere { center: Vector { x: 0.0, y: 1.0, z: -0.25}, radius: 1.0 }),
+                     Box::new(Sphere { center: Vector { x: -1.0, y: 0.5, z: 1.5}, radius: 0.5 })],
         lights: vec![],
         camera: Camera { pos: Vector {x: 3.0, y: 2.0, z: 4.0}, lookAt: Vector { x: -1.0, y: 0.5, z: 0.0}}
     }
