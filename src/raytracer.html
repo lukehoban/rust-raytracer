@@ -14,19 +14,19 @@ Vector.minus = function(v1,v2) { return new Vector(v1.x-v2.x,v1.y-v2.y,v1.z-v2.z
 Vector.plus  = function(v1,v2) { return new Vector(v1.x+v2.x,v1.y+v2.y,v1.z+v2.z); }
 Vector.dot   = function(v1,v2) { return v1.x*v2.x+v1.y*v2.y+v1.z*v2.z; }
 Vector.mag   = function(v)     { return Math.sqrt(v.x*v.x+v.y*v.y+v.z*v.z); }
-Vector.norm  = function(v)     { 
-    var mag = Vector.mag(v); 
+Vector.norm  = function(v)     {
+    var mag = Vector.mag(v);
     var div = (mag === 0)?Infinity:1.0/mag;
-    return Vector.times(div,v); 
+    return Vector.times(div,v);
 }
-Vector.cross  = function(v1,v2)     { 
+Vector.cross  = function(v1,v2)     {
     return new Vector(v1.y*v2.z-v1.z*v2.y,
                       v1.z*v2.x-v1.x*v2.z,
                       v1.x*v2.y-v1.y*v2.x);
 }
 
 
-function Color(r,g,b) { 
+function Color(r,g,b) {
     this.r = r;
     this.g = g;
     this.b = b;
@@ -42,11 +42,11 @@ Color.background = Color.black;
 Color.defaultColor = Color.black;
 Color.toDrawingColor = function(c) {
     var legalize = function(d) { return d>1?1:d; }
-    return { 
+    return {
       r : Math.floor(legalize(c.r) * 255),
       g : Math.floor(legalize(c.g) * 255),
-      b : Math.floor(legalize(c.b) * 255) 
-    }      
+      b : Math.floor(legalize(c.b) * 255)
+    }
 }
 
 function Camera(pos,lookAt) {
@@ -63,10 +63,10 @@ function Camera(pos,lookAt) {
 
 function Sphere(center, radius, surface) {
     var radius2 = radius * radius;
-    return { 
+    return {
       surface    : surface,
       normal     : function(pos) { return Vector.norm(Vector.minus(pos, center)); },
-      intersect  : function(ray) { 
+      intersect  : function(ray) {
           var eo = Vector.minus(center, ray.start);
           var v = Vector.dot(eo, ray.dir);
           var dist;
@@ -99,7 +99,7 @@ function Plane(norm, offset, surface) {
                 return undefined;
             } else {
                 var dist = (Vector.dot(norm,ray.start)+offset) / (-denom);
-                return {thing:this,ray:ray,dist:dist}; 
+                return {thing:this,ray:ray,dist:dist};
             }
         }
     }
@@ -114,7 +114,7 @@ Surfaces.shiny = {
 
     }
 Surfaces.checkerboard = {
-        diffuse  : function(pos) { 
+        diffuse  : function(pos) {
             if ((Math.floor(pos.z)+Math.floor(pos.x)) % 2 !== 0) {
                 return Color.white;
             } else {
@@ -122,7 +122,7 @@ Surfaces.checkerboard = {
             }
         },
         specular : function(pos) { return Color.white; },
-        reflect  : function(pos) { 
+        reflect  : function(pos) {
             if ((Math.floor(pos.z)+Math.floor(pos.x)) % 2 !== 0) {
                 return 0.1;
             } else {
@@ -143,7 +143,7 @@ function RayTracer() {
            var inter = scene.things[i].intersect(ray);
            if(inter!== undefined && inter.dist < closest){
                closestInter = inter;
-           }    
+           }
        }
        return closestInter;
     }
@@ -223,18 +223,18 @@ function RayTracer() {
 
 
 function defaultScene() {
-    return { 
+    return {
           things : [ Plane ( new Vector(0.0, 1.0, 0.0), 0.0, Surfaces.checkerboard),
                      Sphere( new Vector(0.0, 1.0, -0.25), 1.0, Surfaces.shiny),
                      Sphere( new Vector(-1.0, 0.5, 1.5), 0.5, Surfaces.shiny) ],
-          lights : [ { pos : new Vector(-2.0, 2.5, 0.0), color : new Color(0.49, 0.07, 0.07)}, 
+          lights : [ { pos : new Vector(-2.0, 2.5, 0.0), color : new Color(0.49, 0.07, 0.07)},
                      { pos : new Vector(1.5, 2.5, 1.5),  color : new Color(0.07, 0.07, 0.49)},
                      { pos : new Vector(1.5, 2.5, -1.5), color : new Color(0.07, 0.49, 0.071)},
                      { pos : new Vector(0.0, 3.5, 0.0),  color : new Color(0.21, 0.21, 0.35)} ],
           camera : new Camera(new Vector(3.0, 2.0, 4.0), new Vector(-1.0, 0.5, 0.0)) };
 }
 
-    
+
 
 function exec() {
   var canv = document.getElementById("canv");
@@ -242,7 +242,7 @@ function exec() {
   var rayTracer = new RayTracer();
   return rayTracer.render(defaultScene(),ctx,256,256);
 }
-  
+
 
 
 function draw() {

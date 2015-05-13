@@ -1,11 +1,7 @@
-
-
 extern crate image;
-use std::path::Path;
-use image::{
-    ImageBuffer
-};
 
+use std::path::Path;
+use image::ImageBuffer;
 
 struct Vector { x: f64, y: f64, z: f64 }
 impl Vector {
@@ -22,6 +18,38 @@ impl Color {
   fn to_drawing_color(c: Color) -> Color {
     c
   }
+  fn background() -> Color {
+      Color {r: 0.0, g: 0.0, b: 0.0 }
+  }
+}
+
+struct Ray { dir: Vector, start: Vector }
+struct Intersect { thing: Box<Thing>, ray: Ray, dist: f64}
+trait Thing {
+    fn normal(&self, pos: Vector) -> Vector;
+    fn intersect(&self, ray: Ray) -> Intersect;
+}
+struct Light { pos: Vector, color: Color }
+struct Camera { }
+struct Scene { things: Box<[Thing]>, lights: Box<[Light]>, camera: Camera }
+
+fn intersections(ray: Ray, scene: Scene) -> Option<Intersect>{
+  panic!()
+}
+
+fn traceRay(ray: Ray, scene: Scene, depth: u32) -> Color {
+    match intersections(ray, scene) {
+        Some(isect) => Color::background(),
+        None => Color::background()
+    }
+}
+
+fn defaultScene() -> Scene {
+    {
+        things: Box::new([]),
+        lights: Box::new([]),
+        camera: Camera { }
+    }
 }
 
 fn main() {
@@ -32,7 +60,6 @@ fn main() {
     Color::scale(4.0, c);
 
     println!("Hello world!");
-
 
     //Construct a new by repeated calls to the supplied closure.
     let img = ImageBuffer::from_fn(512, 512, |x, y| {
@@ -45,4 +72,5 @@ fn main() {
 
     //Write the contents of this image to the Writer in PNG format.
     let _ = img.save(&Path::new("test.png"));
+
 }
