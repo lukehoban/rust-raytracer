@@ -55,11 +55,6 @@ impl Color {
 
 struct Ray<'a> { dir: &'a Vector, start: &'a Vector }
 struct Intersect<'a> { thing: &'a Thing, dist: f64}
-trait Thing {
-    fn normal(&self, pos: &Vector) -> Vector;
-    fn intersect<'a>(&'a self, ray: &Ray) -> Option<Intersect<'a>>;
-    fn surface(&self) -> &Surface;
-}
 struct Light { pos: Vector, color: Color }
 struct Camera { pos: Vector, forward: Vector, right: Vector, up: Vector }
 impl Camera {
@@ -72,6 +67,12 @@ impl Camera {
     }
 }
 struct Scene { things: Vec<Box<Thing>>, lights: Vec<Light>, camera: Camera }
+
+trait Thing {
+    fn normal(&self, pos: &Vector) -> Vector;
+    fn intersect<'a>(&'a self, ray: &Ray) -> Option<Intersect<'a>>;
+    fn surface(&self) -> &Surface;
+}
 
 struct Sphere { center: Vector, radius: f64, surface: Box<Surface> }
 impl Thing for Sphere {
@@ -173,7 +174,6 @@ fn trace_ray(ray: &Ray, scene: &Scene, depth: u32) -> Color {
         Color::background(),
         |isect| shade(&isect, &scene, &ray, depth))
 }
-
 
 const MAXDEPTH: u32 = 5;
 
