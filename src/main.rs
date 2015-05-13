@@ -30,6 +30,10 @@ impl Vector {
     fn cross(v1: &Vector, v2: &Vector) -> Vector {
         Vector { x: v1.y*v2.z-v1.z*v2.y, y: v1.z*v2.x-v1.x*v2.z, z: v1.x*v2.y-v1.y*v2.x }
     }
+    fn dot_pos_neg<T, F1, F2>(v1: &Vector, v2: &Vector, pos: F1, neg: F2) -> T where F1: FnOnce(f64) -> T, F2: FnOnce(f64) -> T {
+        let d = Vector::dot(&v1, &v2);
+        if d > 0.0 { pos(d) } else { neg(d) }
+    }
 }
 
 struct Color { r: f64, g: f64, b: f64 }
@@ -82,14 +86,10 @@ impl Thing for Sphere {
     }
     fn intersect<'a>(&'a self, ray: &Ray) -> Option<Intersect<'a>> {
         let eo = Vector::minus(&self.center, &ray.start);
-        let v = Vector::dot(&eo, &ray.dir);
-        let dist =
-            if v < 0.0 {
-                0.0
-            } else {
-                let disc = self.radius*self.radius - Vector::dot(&eo, &eo) + v*v;
-                if disc < 0.0 { 0.0 } else { v - disc.sqrt() }
-            };
+        let dist = Vector::dot_pos_neg(&eo, &ray.dir, |v| {
+            let disc = self.radius*self.radius - Vector::dot(&eo, &eo) + v*v;
+            if disc < 0.0 { 0.0 } else { v - disc.sqrt() }
+        }, |_| 0.0);
         if dist == 0.0 {
             None
         } else {
@@ -103,13 +103,10 @@ impl Thing for Plane {
     fn surface(&self) -> &Surface { &*self.surface }
     fn normal(&self, _: &Vector) -> Vector { self.norm.clone() }
     fn intersect<'a>(&'a self, ray: &Ray) -> Option<Intersect<'a>> {
-        let denom = Vector::dot(&self.norm, &ray.dir);
-        if denom > 0.0 {
-            None
-        } else {
+        Vector::dot_pos_neg(&self.norm, &ray.dir, |_| None, |denom| {
             let dist = (Vector::dot(&self.norm, &ray.start) + self.offset) / -denom;
             Some(Intersect{thing: self, dist: dist})
-        }
+        })
     }
 }
 
@@ -197,32 +194,25 @@ fn get_reflection_color(thing: &Thing, pos: Vector, rd: Vector, scene: &Scene, d
 }
 
 fn get_natural_color(thing: &Thing, pos: &Vector, normal: &Vector, rd: &Vector, scene: &Scene) -> Color {
-    scene.lights.iter().fold(Color::black(), |col, light| {
+    let color_light = |light: &Light| {
         let ldis = Vector::minus(&light.pos, &pos);
         let livec = Vector::norm(&ldis);
         let neat_isect = test_ray(&Ray {start: &pos, dir: &livec}, &scene);
         let is_in_shadow = neat_isect.map_or(false, |isect| isect <= Vector::mag(&ldis));
         if is_in_shadow {
-            col
+            None
         } else {
-            let illum = Vector::dot(&livec, &normal);
-            let lcolor =
-                if illum > 0.0 {
-                    Color::scale(illum, &light.color)
-                } else {
-                    Color::black()
-                };
-            let specular = Vector::dot(&livec, &Vector::norm(&rd));
-            let scolor =
-                if specular > 0.0 {
-                    Color::scale(specular.powi(thing.surface().roughness()), &light.color)
-                } else {
-                    Color::black()
-                };
-            Color::plus(&col, &Color::plus(&Color::times(&thing.surface().diffuse(pos), &lcolor),
+            let lcolor = Vector::dot_pos_neg(&livec, &normal, |illum| {
+                Color::scale(illum, &light.color)
+            }, |_| Color::black());
+            let scolor = Vector::dot_pos_neg(&livec, &Vector::norm(&rd), |specular| {
+                Color::scale(specular.powi(thing.surface().roughness()), &light.color)
+            }, |_| Color::black());
+            Some(Color::plus(&Color::times(&thing.surface().diffuse(pos), &lcolor),
                                            &Color::times(&thing.surface().specular(pos), &scolor)))
         }
-    })
+    };
+    scene.lights.iter().filter_map(color_light).fold(Color::black(), |acc, col| Color::plus(&acc, &col))
 }
 
 
@@ -248,8 +238,8 @@ fn main() {
 
     let scene = default_scene();
 
-    let width = 4000;
-    let height = 4000;
+    let width = 1000;
+    let height = 1000;
     let ref camera = scene.camera;
     let get_point = |x,y| {
         let recenter_x = |x: f64| (x - ((width as f64) / 2.0))  / (2.0 * (width as f64));
@@ -262,14 +252,12 @@ fn main() {
                     &Vector::times(recenter_y(y as f64), &camera.up))))
     };
 
-    //Construct a new by repeated calls to the supplied closure.
     let img = ImageBuffer::from_fn(width, height, |x, y| {
         let ray = Ray { start: &scene.camera.pos, dir: &get_point(x,y) };
         let color = trace_ray(&ray, &scene, 0).to_drawing_color();
         image::Rgb(color)
     });
 
-    //Write the contents of this image to the Writer in PNG format.
     let _ = img.save(&Path::new("test.png"));
     println!("Finished!  Open test.png to see the results.")
 }
