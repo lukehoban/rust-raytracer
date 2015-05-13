@@ -2,6 +2,7 @@ extern crate image;
 
 use std::f64::INFINITY;
 use std::path::Path;
+use std::ops::Add;
 use image::ImageBuffer;
 
 #[derive(Clone)]
@@ -51,6 +52,12 @@ impl Color {
   fn grey() -> Color { Color {r: 0.5, g: 0.5, b: 0.5 } }
   fn black() -> Color { Color {r: 0.0, g: 0.0, b: 0.0 } }
   fn background() -> Color { Color::black() }
+}
+impl<'a> Add<Color> for &'a Color {
+    type Output = &'a Color;
+    fn add(&self, other: Color) -> &'a Color {
+        Color::plus(&self, &other)
+    }
 }
 
 struct Ray<'a> { dir: &'a Vector, start: &'a Vector }
