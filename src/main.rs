@@ -63,6 +63,7 @@ struct Intersect<'a> { thing: &'a Thing, dist: f64}
 trait Thing {
     fn normal(&self, pos: Vector) -> Vector;
     fn intersect<'a>(&'a self, ray: &Ray) -> Option<Intersect<'a>>;
+    fn surface(&self) -> &Surface;
 }
 struct Light { pos: Vector, color: Color }
 struct Camera { pos: Vector, forward: Vector, right: Vector, up: Vector }
@@ -77,7 +78,7 @@ impl Camera {
 }
 struct Scene { things: Vec<Box<Thing>>, lights: Vec<Light>, camera: Camera }
 
-struct Sphere { center: Vector, radius: f64 }
+struct Sphere { center: Vector, radius: f64, surface: &'static Surface }
 impl Thing for Sphere {
     fn normal(&self, pos: Vector) -> Vector {
         Vector::norm(&Vector::minus(&pos, &self.center))
@@ -98,7 +99,28 @@ impl Thing for Sphere {
             Some(Intersect { thing: self, dist: dist})
         }
     }
+    fn surface(&self) -> &Surface { self.surface }
 }
+
+trait Surface {
+    fn diffuse(&self, pos: Vector) -> Color;
+    fn specular(&self, pos: Vector) -> Color;
+    fn reflect(&self, pos: Vector) -> f64;
+}
+
+struct Checkerboard;
+impl Surface for Checkerboard {
+    fn diffuse(&self, pos: Vector) -> Color {
+        if 0 == (pos.z.floor() + pos.x.floor()) as u32 % 2 { Color::white() } else { Color::black() }
+    }
+    fn specular(&self, pos: Vector) -> Color {
+        Color::white()
+    }
+    fn reflect(&self, pos: Vector) -> f64 {
+        if 0 == (pos.z.floor() + pos.x.floor()) as u32 % 2 { 0.1 } else { 0.7 }
+    }
+}
+const checkerboard: &'static Surface = &Checkerboard;
 
 fn intersections<'a>(ray: &Ray, scene: &'a Scene) -> Option<Intersect<'a>> {
   let mut closest = INFINITY;
@@ -138,23 +160,25 @@ fn shade(isect: &Intersect, scene: &Scene, ray: &Ray, depth: u32) -> Color {
         &Color::background(),
         &get_natural_color(isect.thing, &pos, &normal, &reflect_dir, &scene));
     let reflected_color = if depth >= MAXDEPTH { Color::grey() } else {
-        get_reflection_color(isect.thing, &pos, &normal, &reflect_dir, &scene, depth)
+        get_reflection_color(isect.thing, pos, normal, reflect_dir, &scene, depth)
     };
     Color::plus(&natural_color, &reflected_color)
+}
+
+fn get_reflection_color(thing: &Thing, pos: Vector, normal: Vector, rd: Vector, scene: &Scene, depth: u32) -> Color {
+    let ray = Ray { start: pos, dir: rd };
+    Color::scale(thing.surface().reflect(pos), trace_ray(&ray, &scene, depth + 1))
 }
 
 fn get_natural_color(isect: &Thing, pos: &Vector, normal: &Vector, reflectDir: &Vector, scene: &Scene) -> Color {
     panic!();
 }
 
-fn get_reflection_color(isect: &Thing, pos: &Vector, normal: &Vector, reflectDir: &Vector, scene: &Scene, depth: u32) -> Color {
-    panic!();
-}
 
 fn default_scene() -> Scene {
     Scene {
-        things: vec![Box::new(Sphere { center: Vector { x: 0.0, y: 1.0, z: -0.25}, radius: 1.0 }),
-                     Box::new(Sphere { center: Vector { x: -1.0, y: 0.5, z: 1.5}, radius: 0.5 })],
+        things: vec![Box::new(Sphere { center: Vector { x: 0.0, y: 1.0, z: -0.25}, radius: 1.0, surface: checkerboard }),
+                     Box::new(Sphere { center: Vector { x: -1.0, y: 0.5, z: 1.5}, radius: 0.5, surface: checkerboard})],
         lights: vec![],
         camera: Camera::new(Vector {x: 3.0, y: 2.0, z: 4.0}, Vector { x: -1.0, y: 0.5, z: 0.0})
     }
