@@ -42,11 +42,14 @@ impl Display for Vector {
 
 struct Color { r: f64, g: f64, b: f64 }
 impl Color {
-  fn scale(k: f64, c: Color) -> Color {
+  fn scale(k: f64, c: &Color) -> Color {
       Color {r: k*c.r, g: k*c.g, b: k*c.b}
   }
   fn plus(v1: &Color, v2: &Color) -> Color {
       Color {r: v1.r+v2.r, g: v1.g+v2.g, b: v1.b+v2.b}
+  }
+  fn times(v1: &Color, v2: &Color) -> Color {
+      Color {r: v1.r*v2.r, g: v1.g*v2.g, b: v1.b*v2.b}
   }
   fn to_drawing_color(&self) -> [u8; 3] {
     let legalize = |d| if d > 1.0 { 1.0 } else { d };
@@ -106,19 +109,36 @@ trait Surface {
     fn diffuse(&self, pos: Vector) -> Color;
     fn specular(&self, pos: Vector) -> Color;
     fn reflect(&self, pos: Vector) -> f64;
+    fn roughness(&self) -> i32;
 }
+
+struct Shiny;
+impl Surface for Shiny {
+    fn diffuse(&self, _: Vector) -> Color {
+        Color::white()
+    }
+    fn specular(&self, _: Vector) -> Color {
+        Color::grey()
+    }
+    fn reflect(&self, _: Vector) -> f64 {
+        0.7
+    }
+    fn roughness(&self) -> i32 { 250 }
+}
+const shiny: &'static Surface = &Shiny;
 
 struct Checkerboard;
 impl Surface for Checkerboard {
     fn diffuse(&self, pos: Vector) -> Color {
         if 0 == (pos.z.floor() + pos.x.floor()) as u32 % 2 { Color::white() } else { Color::black() }
     }
-    fn specular(&self, pos: Vector) -> Color {
+    fn specular(&self, _: Vector) -> Color {
         Color::white()
     }
     fn reflect(&self, pos: Vector) -> f64 {
         if 0 == (pos.z.floor() + pos.x.floor()) as u32 % 2 { 0.1 } else { 0.7 }
     }
+    fn roughness(&self) -> i32 { 150 }
 }
 const checkerboard: &'static Surface = &Checkerboard;
 
@@ -139,15 +159,16 @@ fn intersections<'a>(ray: &Ray, scene: &'a Scene) -> Option<Intersect<'a>> {
   closest_inter
 }
 
-fn trace_ray(ray: &Ray, scene: &Scene, depth: u32) -> Color {
-    match intersections(&ray, &scene) {
-        Some(isect) => {
-            println!("Intersection {}", isect.dist);
-            shade(&isect, &scene, &ray, depth)
-        },
-        None => Color::background()
-    }
+fn test_ray(ray: &Ray, scene: &Scene) -> Option<f64> {
+    intersections(&ray, &scene).map(|isect| isect.dist)
 }
+
+fn trace_ray(ray: &Ray, scene: &Scene, depth: u32) -> Color {
+    intersections(&ray, &scene).map_or(
+        Color::background(),
+        |isect| shade(&isect, &scene, &ray, depth))
+}
+
 
 const MAXDEPTH: u32 = 5;
 
@@ -158,7 +179,7 @@ fn shade(isect: &Intersect, scene: &Scene, ray: &Ray, depth: u32) -> Color {
     let reflect_dir = Vector::minus(&d, &Vector::times(2.0, &Vector::times(Vector::dot(&normal, &d), &normal)));
     let natural_color = Color::plus(
         &Color::background(),
-        &get_natural_color(isect.thing, &pos, &normal, &reflect_dir, &scene));
+        &get_natural_color(isect.thing, pos, normal, reflect_dir, &scene));
     let reflected_color = if depth >= MAXDEPTH { Color::grey() } else {
         get_reflection_color(isect.thing, pos, normal, reflect_dir, &scene, depth)
     };
@@ -167,17 +188,43 @@ fn shade(isect: &Intersect, scene: &Scene, ray: &Ray, depth: u32) -> Color {
 
 fn get_reflection_color(thing: &Thing, pos: Vector, normal: Vector, rd: Vector, scene: &Scene, depth: u32) -> Color {
     let ray = Ray { start: pos, dir: rd };
-    Color::scale(thing.surface().reflect(pos), trace_ray(&ray, &scene, depth + 1))
+    Color::scale(thing.surface().reflect(pos), &trace_ray(&ray, &scene, depth + 1))
 }
 
-fn get_natural_color(isect: &Thing, pos: &Vector, normal: &Vector, reflectDir: &Vector, scene: &Scene) -> Color {
-    panic!();
+fn get_natural_color(thing: &Thing, pos: Vector, normal: Vector, rd: Vector, scene: &Scene) -> Color {
+    let add_light = |col: Color, light: &Light| {
+        let ldis = Vector::minus(&light.pos, &pos);
+        let livec = Vector::norm(&ldis);
+        let neat_isect = test_ray(&Ray {start: pos, dir: livec}, &scene);
+        let is_in_shadow = neat_isect.map_or(false, |isect| isect <= Vector::mag(&ldis));
+        if is_in_shadow {
+            col
+        } else {
+            let illum = Vector::dot(&livec, &normal);
+            let lcolor =
+                if illum > 0.0 {
+                    Color::scale(illum, &light.color)
+                } else {
+                    Color::black()
+                };
+            let specular = Vector::dot(&livec, &Vector::norm(&rd));
+            let scolor =
+                if specular > 0.0 {
+                    Color::scale(specular.powi(thing.surface().roughness()), &light.color)
+                } else {
+                    Color::black()
+                };
+            Color::plus(&col, &Color::plus(&Color::times(&thing.surface().diffuse(pos), &lcolor),
+                                           &Color::times(&thing.surface().specular(pos), &scolor)))
+        }
+    };
+    scene.lights.iter().fold(Color::black(), add_light)
 }
 
 
 fn default_scene() -> Scene {
     Scene {
-        things: vec![Box::new(Sphere { center: Vector { x: 0.0, y: 1.0, z: -0.25}, radius: 1.0, surface: checkerboard }),
+        things: vec![Box::new(Sphere { center: Vector { x: 0.0, y: 1.0, z: -0.25}, radius: 1.0, surface: shiny }),
                      Box::new(Sphere { center: Vector { x: -1.0, y: 0.5, z: 1.5}, radius: 0.5, surface: checkerboard})],
         lights: vec![],
         camera: Camera::new(Vector {x: 3.0, y: 2.0, z: 4.0}, Vector { x: -1.0, y: 0.5, z: 0.0})
@@ -185,12 +232,6 @@ fn default_scene() -> Scene {
 }
 
 fn main() {
-    let v = Vector {x: 1.0, y:2.0, z:3.0};
-    Vector::times(4.0, &v);
-
-    let c = Color {r: 1.0, g:2.0, b:3.0};
-    Color::scale(4.0, c);
-
     println!("Hello world!");
 
     let width = 10;
