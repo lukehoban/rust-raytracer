@@ -253,10 +253,10 @@ fn default_scene() -> Scene {
 }
 
 fn main() {
-    println!("Hello world!");
+    println!("Rendering...");
 
-    let width = 512;
-    let height = 512;
+    let width = 4000;
+    let height = 4000;
     let scene = default_scene();
     let ref camera = scene.camera;
     let get_point = |x,y| {
@@ -279,5 +279,5 @@ fn main() {
 
     //Write the contents of this image to the Writer in PNG format.
     let _ = img.save(&Path::new("test.png"));
-
+    println!("Finished!  Open test.png to see the results.")
 }
