@@ -37,10 +37,10 @@ impl Color {
 }
 
 struct Ray { dir: Vector, start: Vector }
-struct Intersect<'a> { thing: &'a Thing, ray: Ray, dist: f64}
+struct Intersect<'a> { thing: &'a Thing, dist: f64}
 trait Thing {
     fn normal(&self, pos: Vector) -> Vector;
-    fn intersect<'a>(&'a self, ray: Ray) -> Option<Intersect<'a>>;
+    fn intersect<'a>(&'a self, ray: &Ray) -> Option<Intersect<'a>>;
 }
 struct Light { pos: Vector, color: Color }
 struct Camera { pos: Vector, lookAt: Vector }
@@ -51,7 +51,7 @@ impl Thing for Sphere {
     fn normal(&self, pos: Vector) -> Vector {
         Vector::norm(&Vector::minus(&pos, &self.center))
     }
-    fn intersect<'a>(&'a self, ray: Ray) -> Option<Intersect<'a>> {
+    fn intersect<'a>(&'a self, ray: &Ray) -> Option<Intersect<'a>> {
         let eo = Vector::minus(&self.center, &ray.start);
         let v = Vector::dot(&eo, &ray.dir);
         let dist =
@@ -64,22 +64,31 @@ impl Thing for Sphere {
         if dist == 0.0 {
             None
         } else {
-            Some(Intersect { thing: self, ray: ray, dist: dist})
+            Some(Intersect { thing: self, dist: dist})
         }
     }
 }
 
 
-fn intersections(ray: Ray, scene: &Scene) -> Option<&Intersect>{
-  let closest = INFINITY;
+fn intersections<'a>(ray: &Ray, scene: &'a Scene) -> Option<Intersect<'a>> {
+  let mut closest = INFINITY;
+  let mut closest_inter = None;
   for thing in &scene.things {
-      let inter = thing.intersect(ray);
+      match thing.intersect(&ray) {
+          Some(inter) => {
+              if inter.dist < closest {
+                  closest = inter.dist;
+                  closest_inter = Some(inter);
+              }
+          },
+          _ => {}
+      }
   }
-  panic!()
+  closest_inter
 }
 
 fn trace_ray(ray: Ray, scene: Scene, depth: u32) -> Color {
-    match intersections(ray, &scene) {
+    match intersections(&ray, &scene) {
         Some(isect) => Color::background(),
         None => Color::background()
     }
