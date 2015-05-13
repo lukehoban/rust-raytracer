@@ -1,11 +1,10 @@
 extern crate image;
 
-use std::fmt::{Display, Formatter, Result};
-use std::path::Path;
 use std::f64::INFINITY;
+use std::path::Path;
 use image::ImageBuffer;
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 struct Vector { x: f64, y: f64, z: f64 }
 impl Vector {
     fn times(k: f64, v: &Vector) -> Vector {
@@ -29,14 +28,7 @@ impl Vector {
         Vector::times(div, &v)
     }
     fn cross(v1: &Vector, v2: &Vector) -> Vector {
-        Vector { x: v1.y*v2.z-v1.z*v2.y,
-                 y: v1.z*v2.x-v1.x*v2.z,
-                 z: v1.x*v2.y-v1.y*v2.x }
-    }
-}
-impl Display for Vector {
-    fn fmt(&self, f: &mut Formatter) -> Result {
-        write!(f, "<{},{},{}>", self.x, self.y, self.z)
+        Vector { x: v1.y*v2.z-v1.z*v2.y, y: v1.z*v2.x-v1.x*v2.z, z: v1.x*v2.y-v1.y*v2.x }
     }
 }
 
@@ -61,10 +53,10 @@ impl Color {
   fn background() -> Color { Color::black() }
 }
 
-struct Ray { dir: Vector, start: Vector }
+struct Ray<'a> { dir: &'a Vector, start: &'a Vector }
 struct Intersect<'a> { thing: &'a Thing, dist: f64}
 trait Thing {
-    fn normal(&self, pos: Vector) -> Vector;
+    fn normal(&self, pos: &Vector) -> Vector;
     fn intersect<'a>(&'a self, ray: &Ray) -> Option<Intersect<'a>>;
     fn surface(&self) -> &Surface;
 }
@@ -84,7 +76,7 @@ struct Scene { things: Vec<Box<Thing>>, lights: Vec<Light>, camera: Camera }
 struct Sphere { center: Vector, radius: f64, surface: Box<Surface> }
 impl Thing for Sphere {
     fn surface(&self) -> &Surface { &*self.surface }
-    fn normal(&self, pos: Vector) -> Vector {
+    fn normal(&self, pos: &Vector) -> Vector {
         Vector::norm(&Vector::minus(&pos, &self.center))
     }
     fn intersect<'a>(&'a self, ray: &Ray) -> Option<Intersect<'a>> {
@@ -108,7 +100,7 @@ impl Thing for Sphere {
 struct Plane { norm: Vector, offset: f64, surface: Box<Surface> }
 impl Thing for Plane {
     fn surface(&self) -> &Surface { &*self.surface }
-    fn normal(&self, _: Vector) -> Vector { self.norm }
+    fn normal(&self, _: &Vector) -> Vector { self.norm.clone() }
     fn intersect<'a>(&'a self, ray: &Ray) -> Option<Intersect<'a>> {
         let denom = Vector::dot(&self.norm, &ray.dir);
         if denom > 0.0 {
@@ -121,21 +113,21 @@ impl Thing for Plane {
 }
 
 trait Surface {
-    fn diffuse(&self, pos: Vector) -> Color;
-    fn specular(&self, pos: Vector) -> Color;
-    fn reflect(&self, pos: Vector) -> f64;
+    fn diffuse(&self, pos: &Vector) -> Color;
+    fn specular(&self, pos: &Vector) -> Color;
+    fn reflect(&self, pos: &Vector) -> f64;
     fn roughness(&self) -> i32;
 }
 
 struct Shiny;
 impl Surface for Shiny {
-    fn diffuse(&self, _: Vector) -> Color {
+    fn diffuse(&self, _: &Vector) -> Color {
         Color::white()
     }
-    fn specular(&self, _: Vector) -> Color {
+    fn specular(&self, _: &Vector) -> Color {
         Color::grey()
     }
-    fn reflect(&self, _: Vector) -> f64 {
+    fn reflect(&self, _: &Vector) -> f64 {
         0.7
     }
     fn roughness(&self) -> i32 { 250 }
@@ -143,13 +135,13 @@ impl Surface for Shiny {
 
 struct Checkerboard;
 impl Surface for Checkerboard {
-    fn diffuse(&self, pos: Vector) -> Color {
+    fn diffuse(&self, pos: &Vector) -> Color {
         if 0 == (pos.z.floor() + pos.x.floor()) as u32 % 2 { Color::white() } else { Color::black() }
     }
-    fn specular(&self, _: Vector) -> Color {
+    fn specular(&self, _: &Vector) -> Color {
         Color::white()
     }
-    fn reflect(&self, pos: Vector) -> f64 {
+    fn reflect(&self, pos: &Vector) -> f64 {
         if 0 == (pos.z.floor() + pos.x.floor()) as u32 % 2 { 0.1 } else { 0.7 }
     }
     fn roughness(&self) -> i32 { 150 }
@@ -188,11 +180,11 @@ const MAXDEPTH: u32 = 5;
 fn shade(isect: &Intersect, scene: &Scene, ray: &Ray, depth: u32) -> Color {
     let d = ray.dir;
     let pos = Vector::plus(&Vector::times(isect.dist, &d), &ray.start);
-    let normal = isect.thing.normal(pos);
+    let normal = isect.thing.normal(&pos);
     let reflect_dir = Vector::minus(&d, &Vector::times(2.0, &Vector::times(Vector::dot(&normal, &d), &normal)));
     let natural_color = Color::plus(
         &Color::background(),
-        &get_natural_color(isect.thing, pos, normal, reflect_dir, &scene));
+        &get_natural_color(isect.thing, &pos, &normal, &reflect_dir, &scene));
     let reflected_color = if depth >= MAXDEPTH { Color::grey() } else {
         get_reflection_color(isect.thing, pos, reflect_dir, &scene, depth)
     };
@@ -200,15 +192,15 @@ fn shade(isect: &Intersect, scene: &Scene, ray: &Ray, depth: u32) -> Color {
 }
 
 fn get_reflection_color(thing: &Thing, pos: Vector, rd: Vector, scene: &Scene, depth: u32) -> Color {
-    let ray = Ray { start: pos, dir: rd };
-    Color::scale(thing.surface().reflect(pos), &trace_ray(&ray, &scene, depth + 1))
+    let ray = Ray { start: &pos, dir: &rd };
+    Color::scale(thing.surface().reflect(&pos), &trace_ray(&ray, &scene, depth + 1))
 }
 
-fn get_natural_color(thing: &Thing, pos: Vector, normal: Vector, rd: Vector, scene: &Scene) -> Color {
+fn get_natural_color(thing: &Thing, pos: &Vector, normal: &Vector, rd: &Vector, scene: &Scene) -> Color {
     let add_light = |col: Color, light: &Light| {
         let ldis = Vector::minus(&light.pos, &pos);
         let livec = Vector::norm(&ldis);
-        let neat_isect = test_ray(&Ray {start: pos, dir: livec}, &scene);
+        let neat_isect = test_ray(&Ray {start: &pos, dir: &livec}, &scene);
         let is_in_shadow = neat_isect.map_or(false, |isect| isect <= Vector::mag(&ldis));
         if is_in_shadow {
             col
@@ -255,8 +247,8 @@ fn default_scene() -> Scene {
 fn main() {
     println!("Rendering...");
 
-    let width = 4000;
-    let height = 4000;
+    let width = 1000;
+    let height = 1000;
     let scene = default_scene();
     let ref camera = scene.camera;
     let get_point = |x,y| {
@@ -272,7 +264,7 @@ fn main() {
 
     //Construct a new by repeated calls to the supplied closure.
     let img = ImageBuffer::from_fn(width, height, |x, y| {
-        let ray = Ray { start: scene.camera.pos, dir: get_point(x,y) };
+        let ray = Ray { start: &scene.camera.pos, dir: &get_point(x,y) };
         let color = trace_ray(&ray, &scene, 0).to_drawing_color();
         image::Rgb(color)
     });
