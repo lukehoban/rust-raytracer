@@ -5,8 +5,17 @@ use image::ImageBuffer;
 
 struct Vector { x: f64, y: f64, z: f64 }
 impl Vector {
-    fn times(k: f64, v: Vector) -> Vector {
+    fn times(k: f64, v: &Vector) -> Vector {
         Vector {x: k*v.x, y: k*v.y, z: k*v.z}
+    }
+    fn minus(v1: &Vector, v2: &Vector) -> Vector {
+        Vector {x: v1.x-v2.x, y: v1.y-v2.y, z: v1.z-v2.z}
+    }
+    fn mag(v: &Vector) -> f64 {
+        (v.x*v.x + v.y*v.y + v.z*v.z).sqrt()
+    }
+    fn norm(v: &Vector) -> Vector {
+        panic!()
     }
 }
 
@@ -30,8 +39,19 @@ trait Thing {
     fn intersect(&self, ray: Ray) -> Intersect;
 }
 struct Light { pos: Vector, color: Color }
-struct Camera { }
-struct Scene { things: Box<[Thing]>, lights: Box<[Light]>, camera: Camera }
+struct Camera { pos: Vector, lookAt: Vector }
+struct Scene { things: Vec<Box<Thing>>, lights: Vec<Light>, camera: Camera }
+
+struct Sphere { center: Vector, radius: f64 }
+impl Thing for Sphere {
+    fn normal(&self, pos: Vector) -> Vector {
+        Vector::norm(&Vector::minus(&pos, &self.center))
+    }
+    fn intersect(&self, ray: Ray) -> Intersect {
+        panic!()
+    }
+}
+
 
 fn intersections(ray: Ray, scene: Scene) -> Option<Intersect>{
   panic!()
@@ -45,16 +65,16 @@ fn traceRay(ray: Ray, scene: Scene, depth: u32) -> Color {
 }
 
 fn defaultScene() -> Scene {
-    {
-        things: Box::new([]),
-        lights: Box::new([]),
-        camera: Camera { }
+    Scene {
+        things: vec![],
+        lights: vec![],
+        camera: Camera { pos: Vector {x: 3.0, y: 2.0, z: 4.0}, lookAt: Vector { x: -1.0, y: 0.5, z: 0.0}}
     }
 }
 
 fn main() {
     let v = Vector {x: 1.0, y:2.0, z:3.0};
-    Vector::times(4.0, v);
+    Vector::times(4.0, &v);
 
     let c = Color {r: 1.0, g:2.0, b:3.0};
     Color::scale(4.0, c);
