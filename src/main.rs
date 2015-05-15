@@ -227,23 +227,16 @@ fn default_scene() -> Scene {
     }
 }
 
-fn main() {
-    println!("Rendering...");
-
-    let scene = default_scene();
-
-    let width = 1000;
-    let height = 1000;
-    let ref camera = scene.camera;
+fn render_to_file(scene: &Scene, width: u32, height: u32, path: &Path) {
     let get_point = |x,y| {
         let recenter_x = |x: f64| (x - ((width as f64) / 2.0))  / (2.0 * (width as f64));
         let recenter_y = |y: f64| -(y - ((height as f64) / 2.0)) / (2.0 * (height as f64));
         Vector::norm(
             &Vector::plus(
-                &camera.forward,
+                &scene.camera.forward,
                 &Vector::plus(
-                    &Vector::times(recenter_x(x as f64), &camera.right),
-                    &Vector::times(recenter_y(y as f64), &camera.up))))
+                    &Vector::times(recenter_x(x as f64), &scene.camera.right),
+                    &Vector::times(recenter_y(y as f64), &scene.camera.up))))
     };
 
     let img = ImageBuffer::from_fn(width, height, |x, y| {
@@ -252,6 +245,13 @@ fn main() {
         image::Rgb(color)
     });
 
-    let _ = img.save(&Path::new("test.png"));
+    let _ = img.save(path);
+}
+
+fn main() {
+    println!("Rendering...");
+
+    render_to_file(&default_scene(), 1000, 1000, &Path::new("test.png"));
+
     println!("Finished!  Open test.png to see the results.")
 }
