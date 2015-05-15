@@ -49,8 +49,8 @@ impl Color {
       Color {r: v1.r*v2.r, g: v1.g*v2.g, b: v1.b*v2.b}
   }
   fn to_drawing_color(&self) -> [u8; 3] {
-    let legalize = |d| if d > 1.0 { 1.0 } else { d };
-    [ (legalize(self.r) * 255.0) as u8, (legalize(self.g) * 255.0) as u8, (legalize(self.b) * 255.0) as u8 ]
+    let legalize = |d| if d > 1.0 { 255 } else { (d * 255.0) as u8 };
+    [legalize(self.r), legalize(self.g), legalize(self.b)]
   }
   fn white() -> Color { Color {r: 1.0, g: 1.0, b: 1.0 } }
   fn grey() -> Color { Color {r: 0.5, g: 0.5, b: 0.5 } }
@@ -251,7 +251,7 @@ fn render_to_file(scene: &Scene, width: u32, height: u32, path: &Path) {
 fn main() {
     println!("Rendering...");
 
-    render_to_file(&default_scene(), 1000, 1000, &Path::new("test.png"));
+    render_to_file(&default_scene(), 512, 512, &Path::new("out.png"));
 
-    println!("Finished!  Open test.png to see the results.")
+    println!("Finished!  Open out.png to see the results.")
 }
