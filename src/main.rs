@@ -141,7 +141,7 @@ impl Surface for Checkerboard {
     fn roughness(&self) -> i32 { 150 }
 }
 
-fn intersections<'a>(ray: &Ray, scene: &'a Scene) -> Option<Intersect<'a>> {
+fn closest_intersection<'a>(ray: &Ray, scene: &'a Scene) -> Option<Intersect<'a>> {
   let mut closest = INFINITY;
   let mut closest_inter = None;
   for thing in &scene.things {
@@ -159,11 +159,11 @@ fn intersections<'a>(ray: &Ray, scene: &'a Scene) -> Option<Intersect<'a>> {
 }
 
 fn test_ray(ray: &Ray, scene: &Scene) -> Option<f64> {
-    intersections(&ray, &scene).map(|isect| isect.dist)
+    closest_intersection(&ray, &scene).map(|isect| isect.dist)
 }
 
 fn trace_ray(ray: &Ray, scene: &Scene, depth: u32) -> Color {
-    intersections(&ray, &scene).map_or(Color::background(), |isect| shade(&isect, &scene, &ray, depth))
+    closest_intersection(&ray, &scene).map_or(Color::background(), |isect| shade(&isect, &scene, &ray, depth))
 }
 
 const MAXDEPTH: u32 = 5;
